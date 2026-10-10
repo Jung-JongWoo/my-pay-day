@@ -1,0 +1,348 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>[hidden]{display:none!important}img{max-width:100%}body{margin:0}</style>
+<title>월급 통장 쪼개기</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+/* Layout: 통장(passbook) 원장 — 왼쪽 입력/버킷, 오른쪽 거래내역 영수증. 모바일은 한 줄로 쌓임 */
+:root{
+  --paper:#f2f4f7; --sheet:#ffffff; --ink:#18243a; --muted:#647089; --line:#dbe0e8;
+  --accent:#2153a3; --accent-soft:#e3ebf8; --stamp:#c2412d; --ok:#2f7d55; --warn:#b5541b;
+  --c1:#2153a3; --c2:#3f8f8a; --c3:#c2832d; --c4:#8a5bb5; --c5:#c2412d; --c6:#5b6b84;
+  --display:"Black Han Sans","IBM Plex Sans KR",sans-serif;
+  --body:"IBM Plex Sans KR",system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --paper:#0f1520; --sheet:#172030; --ink:#e7ecf4; --muted:#93a0b8; --line:#2a3548;
+  --accent:#7ea6ec; --accent-soft:#1f2d47; --stamp:#ef7a63; --ok:#6cc596; --warn:#f0a066;
+  --c1:#7ea6ec; --c2:#6cc0ba; --c3:#e3b267; --c4:#b896de; --c5:#ef7a63; --c6:#97a6bf; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --paper:#0f1520; --sheet:#172030; --ink:#e7ecf4; --muted:#93a0b8; --line:#2a3548;
+  --accent:#7ea6ec; --accent-soft:#1f2d47; --stamp:#ef7a63; --ok:#6cc596; --warn:#f0a066;
+  --c1:#7ea6ec; --c2:#6cc0ba; --c3:#e3b267; --c4:#b896de; --c5:#ef7a63; --c6:#97a6bf; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.6;padding-inline:16px;padding-block:24px 64px}
+.wrap{max-width:1080px;margin:0 auto;display:grid;gap:28px}
+h1,h2{font-family:var(--display);font-weight:400;text-wrap:balance;margin:0;letter-spacing:.01em}
+h1{font-size:clamp(30px,6vw,46px);line-height:1.15}
+h2{font-size:24px}
+.eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+p{margin:0}
+.muted{color:var(--muted)}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+header{display:grid;gap:10px;padding-top:8px}
+header p{max-width:60ch;color:var(--muted)}
+.grid2{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:24px;align-items:start}
+@media (max-width:820px){.grid2{grid-template-columns:minmax(0,1fr)}}
+.panel{background:var(--sheet);border:1px solid var(--line);border-radius:6px;padding:20px;display:grid;gap:16px;min-width:0}
+section{display:grid;gap:16px}
+label{font-size:13px;color:var(--muted)}
+input[type=text],input[type=number]{font:inherit;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:4px;padding:8px 10px;width:100%}
+input:focus-visible,button:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.salary{display:flex;align-items:baseline;gap:8px;border-bottom:2px solid var(--ink);padding-bottom:6px}
+.salary input{font-family:var(--mono);font-size:clamp(26px,5vw,34px);font-weight:600;border:0;background:transparent;padding:0;min-width:0}
+.salary span{font-size:20px;font-weight:600}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+button{font:inherit;cursor:pointer;color:var(--ink);background:var(--sheet);border:1px solid var(--line);border-radius:999px;padding:6px 14px;font-size:13px}
+button:hover{border-color:var(--accent);color:var(--accent)}
+button.on{background:var(--accent);border-color:var(--accent);color:var(--sheet)}
+button.plain{border-radius:4px}
+.presets{display:flex;flex-wrap:wrap;gap:8px}
+.bucket{display:grid;grid-template-columns:14px minmax(0,1fr) auto;gap:10px 12px;align-items:center;padding-block:12px;border-top:1px dashed var(--line)}
+.bucket:first-child{border-top:0}
+.dot{width:12px;height:12px;border-radius:50%}
+.bname{display:flex;gap:8px;align-items:center;min-width:0}
+.bname input{padding:4px 8px;font-weight:600}
+.bname select{font:inherit;font-size:12px;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:4px;padding:4px}
+.bamt{font-family:var(--mono);font-weight:600;text-align:right;white-space:nowrap}
+.bctrl{grid-column:2 / 4;display:flex;gap:10px;align-items:center}
+.bctrl input[type=range]{flex:1;accent-color:var(--accent);min-width:0}
+.pct{width:64px!important;text-align:right;font-family:var(--mono);padding:4px 6px!important}
+.del{border:0;background:none;color:var(--muted);padding:2px 6px;font-size:18px;line-height:1}
+.remtag{font-size:11px;color:var(--accent);background:var(--accent-soft);border-radius:3px;padding:1px 6px;white-space:nowrap}
+.sumbar{display:flex;height:14px;border-radius:3px;overflow:hidden;background:var(--line)}
+.sumbar i{display:block;height:100%}
+.status{font-size:13px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.status b{font-weight:600}
+.bad{color:var(--warn)} .good{color:var(--ok)}
+
+/* 영수증(통장 거래내역) */
+.receipt{background:var(--sheet);border:1px solid var(--line);border-radius:6px;padding:20px;font-family:var(--mono);font-size:13px;position:relative;min-width:0}
+.receipt h3{font-family:var(--body);font-size:14px;margin:0 0 4px}
+.rrow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;padding-block:7px;border-bottom:1px dotted var(--line)}
+.rrow .d{color:var(--muted);font-size:11px}
+.rin{color:var(--accent);font-weight:600}
+.rout{color:var(--ink)}
+.rbal{display:flex;justify-content:space-between;padding-top:10px;font-weight:600}
+.stamp{position:absolute;right:18px;top:14px;border:2px solid var(--stamp);color:var(--stamp);font-family:var(--display);font-size:15px;padding:2px 8px;border-radius:4px;transform:rotate(-8deg);opacity:.85}
+.copy{margin-top:14px;width:100%;border-radius:4px}
+
+.kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+@media (max-width:600px){.kpis{grid-template-columns:minmax(0,1fr)}}
+.kpi{border-left:3px solid var(--line);padding-left:12px}
+.kpi .v{font-family:var(--mono);font-size:22px;font-weight:600}
+.kpi.inv{border-color:var(--c2)} .kpi.dep{border-color:var(--c1)} .kpi.prin{border-color:var(--c6)}
+.controls{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+@media (max-width:700px){.controls{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.field{display:grid;gap:4px;min-width:0}
+.toggle{display:flex;align-items:center;gap:8px;font-size:13px}
+.chartbox{overflow-x:auto}
+svg text{fill:var(--muted);font-family:var(--mono);font-size:11px}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:var(--muted)}
+.legend i{display:inline-block;width:14px;height:3px;vertical-align:middle;margin-right:6px}
+.note{font-size:12px;color:var(--muted);max-width:75ch}
+.goal{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px}
+@media (max-width:700px){.goal{grid-template-columns:minmax(0,1fr)}}
+.goal .out{font-size:15px}
+.goal .out b{font-family:var(--mono);font-size:20px;color:var(--accent)}
+.check{display:grid;gap:8px}
+.check label{display:flex;gap:10px;align-items:flex-start;color:var(--ink);font-size:14px;padding:10px 12px;border:1px solid var(--line);border-radius:4px;background:var(--sheet);cursor:pointer}
+.check input{accent-color:var(--accent);margin-top:4px}
+.check label.done span{text-decoration:line-through;color:var(--muted)}
+@media (prefers-reduced-motion:no-preference){.sumbar i{transition:width .25s}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <span class="eyebrow">Payday Splitter · 내 비율로 나누기</span>
+    <h1>월급 통장 쪼개기</h1>
+    <p>실수령액을 넣고, 통장 개수와 비율을 내 생활에 맞게 바꿔 보세요. 입력값은 이 브라우저에만 남아요.</p>
+  </header>
+
+  <div class="grid2">
+    <div class="panel">
+      <section>
+        <label for="salary">한 달 실수령액</label>
+        <div class="salary"><input id="salary" type="text" inputmode="numeric" value="2,500,000" aria-label="한 달 실수령액"><span>원</span></div>
+        <div class="chips" id="quick"></div>
+      </section>
+      <section>
+        <div class="status"><span class="eyebrow">비율 프리셋</span></div>
+        <div class="presets" id="presets"></div>
+      </section>
+      <section>
+        <div class="sumbar" id="sumbar"></div>
+        <div class="status" id="status"></div>
+        <div id="buckets"></div>
+        <div class="chips">
+          <button class="plain" id="add">+ 통장 추가</button>
+          <button class="plain" id="fill">합계를 100%로 맞추기</button>
+        </div>
+      </section>
+    </div>
+
+    <div class="receipt" aria-live="polite">
+      <div class="stamp">월급날</div>
+      <h3>거래내역</h3>
+      <div class="muted" id="rdate" style="font-size:11px;margin-bottom:8px"></div>
+      <div id="rlist"></div>
+      <button class="copy" id="copy">이체 계획 복사</button>
+      <p class="note" id="copied" style="margin-top:6px" hidden>복사했어요. 메모 앱에 붙여넣으세요.</p>
+    </div>
+  </div>
+
+  <div class="panel">
+    <section>
+      <span class="eyebrow">모으는 돈의 미래</span>
+      <h2>적금으로 둘 때와 투자할 때</h2>
+      <p class="muted" id="savedesc"></p>
+      <div class="controls">
+        <div class="field"><label for="years">기간(년)</label><input id="years" type="number" min="1" max="30" value="5"></div>
+        <div class="field"><label for="dep">적금 연 금리(%)</label><input id="dep" type="number" step="0.1" value="3.5"></div>
+        <div class="field"><label for="inv">투자 연 수익률 가정(%)</label><input id="inv" type="number" step="0.5" value="7"></div>
+        <div class="field"><label>&nbsp;</label><label class="toggle" for="tax"><input id="tax" type="checkbox" checked> 이자소득세 15.4% 반영</label></div>
+      </div>
+      <div class="kpis" id="kpis"></div>
+      <div class="legend"><span><i style="background:var(--c6)"></i>납입 원금</span><span><i style="background:var(--c1)"></i>적금(단리)</span><span><i style="background:var(--c2)"></i>적립식 투자(월복리)</span></div>
+      <div class="chartbox"><svg id="chart" viewBox="0 0 640 260" width="100%" role="img" aria-label="기간별 누적 금액 그래프"></svg></div>
+      <p class="note">적금은 매달 같은 금액을 넣는 정기적금의 단리 이자예요. 1년 넘는 기간도 하나의 적금으로 계산한 단순 비교값이에요. 투자는 연 수익률을 월 수익률로 환산해 매달 초에 넣는다고 가정했고, 세금·보수·환율은 빼고 계산했어요. 투자는 원금 손실이 날 수 있고 실제 수익률은 해마다 달라요.</p>
+    </section>
+  </div>
+
+  <div class="panel">
+    <section>
+      <span class="eyebrow">목표 계산</span>
+      <h2>언제쯤 모일까</h2>
+      <div class="goal">
+        <div class="field" style="gap:10px">
+          <label for="goalamt">모으고 싶은 금액(만 원)</label>
+          <input id="goalamt" type="number" value="3000" min="0">
+          <p class="out" id="goalout"></p>
+        </div>
+        <div class="field" style="gap:10px">
+          <label for="efmonths">비상금 목표: 생활비 몇 달치</label>
+          <input id="efmonths" type="number" value="3" min="1" max="12">
+          <p class="out" id="efout"></p>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div class="panel">
+    <section>
+      <span class="eyebrow">월급날 체크리스트</span>
+      <h2>이번 달 이체했나요?</h2>
+      <div class="check" id="check"></div>
+      <button class="plain" id="reset" style="justify-self:start">체크 초기화</button>
+    </section>
+  </div>
+</div>
+
+<script>
+(function(){
+const PRESETS={
+  "40·5·5·50":[["저축",40,"save"],["비상금",5,"emer"],["문화생활",5,"spend"],["생활비",50,"spend"]],
+  "50·30·20":[["생활비(필수)",50,"spend"],["하고 싶은 것",30,"spend"],["저축·투자",20,"save"]],
+  "짠테크 60":[["저축",50,"save"],["투자",10,"save"],["비상금",5,"emer"],["용돈",5,"spend"],["생활비",30,"spend"]],
+  "투자 비중 높게":[["적금",20,"save"],["ETF 적립",25,"save"],["비상금",5,"emer"],["문화생활",5,"spend"],["생활비",45,"spend"]]
+};
+const KIND={save:"모으는 돈",emer:"비상금",spend:"쓰는 돈"};
+const COLORS=["--c1","--c2","--c3","--c4","--c5","--c6"];
+const $=id=>document.getElementById(id);
+const won=n=>Math.round(n).toLocaleString("ko-KR");
+const man=n=>{const m=n/10000;return (m>=10000?(m/10000).toFixed(2).replace(/\.?0+$/,"")+"억":(Math.round(m*10)/10).toLocaleString("ko-KR")+"만")+" 원"};
+
+let state={salary:2500000,buckets:[],rem:0,preset:"40·5·5·50",years:5,dep:3.5,inv:7,tax:true,goal:3000,ef:3,check:{}};
+function load(){try{const s=JSON.parse(localStorage.getItem("payday-split")||"null");if(s&&s.buckets&&s.buckets.length)state=Object.assign(state,s);else applyPreset(state.preset,true)}catch(e){applyPreset(state.preset,true)}}
+function save(){try{localStorage.setItem("payday-split",JSON.stringify(state))}catch(e){}}
+function applyPreset(name,silent){state.preset=name;state.buckets=PRESETS[name].map(([n,p,k])=>({name:n,pct:p,kind:k}));
+  const i=state.buckets.findIndex(b=>/생활비/.test(b.name));state.rem=i<0?state.buckets.length-1:i;if(!silent)renderAll()}
+
+function split(){
+  const S=state.salary,bs=state.buckets;
+  const amts=bs.map(b=>Math.floor(S*b.pct/100));
+  const total=bs.reduce((a,b)=>a+Number(b.pct),0);
+  if(Math.abs(total-100)<1e-9){const used=amts.reduce((a,b)=>a+b,0);amts[state.rem]+=S-used}
+  return {amts,total};
+}
+
+function renderTop(){
+  $("salary").value=won(state.salary);
+  $("quick").innerHTML=[2000000,2500000,3000000,3500000,4000000].map(v=>`<button data-v="${v}" class="${v===state.salary?"on":""}">${v/10000}만</button>`).join("");
+  $("presets").innerHTML=Object.keys(PRESETS).map(k=>`<button data-p="${k}" class="${k===state.preset?"on":""}">${k}</button>`).join("");
+}
+function renderBuckets(){
+  const {amts}=split();
+  $("buckets").innerHTML=state.buckets.map((b,i)=>`
+    <div class="bucket">
+      <span class="dot" style="background:var(${COLORS[i%6]})"></span>
+      <div class="bname"><input type="text" id="bn${i}" data-i="${i}" data-f="name" value="${b.name.replace(/"/g,"&quot;")}" aria-label="통장 이름">
+        <select id="bk${i}" data-i="${i}" data-f="kind" aria-label="종류">${Object.entries(KIND).map(([k,v])=>`<option value="${k}" ${k===b.kind?"selected":""}>${v}</option>`).join("")}</select>
+        ${i===state.rem?'<span class="remtag">잔돈 합산</span>':""}</div>
+      <span class="bamt" id="ba${i}">${won(amts[i])}원</span>
+      <div class="bctrl"><input type="range" id="br${i}" min="0" max="100" step="1" value="${b.pct}" data-i="${i}" data-f="pct" aria-label="${b.name} 비율">
+        <input type="number" class="pct" id="bp${i}" min="0" max="100" step="0.5" value="${b.pct}" data-i="${i}" data-f="pct" aria-label="${b.name} 퍼센트">
+        <button class="del" data-del="${i}" title="이 통장 삭제" aria-label="${b.name} 삭제">×</button></div>
+    </div>`).join("");
+  renderDerived();
+}
+function renderDerived(){
+  const {amts,total}=split();
+  state.buckets.forEach((b,i)=>{const el=$("ba"+i);if(el)el.textContent=won(amts[i])+"원"});
+  $("sumbar").innerHTML=state.buckets.map((b,i)=>`<i style="width:${Math.min(b.pct,100)}%;background:var(${COLORS[i%6]})"></i>`).join("");
+  const sv=state.buckets.reduce((a,b)=>a+(b.kind!=="spend"?Number(b.pct):0),0);
+  const diff=Math.round((100-total)*10)/10;
+  $("status").innerHTML=`<span>모으는 돈 <b>${sv}%</b> · 쓰는 돈 <b>${Math.round((total-sv)*10)/10}%</b></span>`+
+    (diff===0?`<span class="good">합계 100% ✓</span>`:`<span class="bad">합계 ${Math.round(total*10)/10}% · ${diff>0?diff+"% 남음":(-diff)+"% 초과"}</span>`);
+  // receipt
+  const d=new Date();$("rdate").textContent=`${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,"0")}.${String(d.getDate()).padStart(2,"0")} 기준 · 원 단위 미만은 '잔돈 합산' 통장에 더해요`;
+  let bal=state.salary;
+  let rows=`<div class="rrow"><span>급여 입금<div class="d">월급 통장</div></span><span class="rin">+${won(state.salary)}</span></div>`;
+  state.buckets.forEach((b,i)=>{bal-=amts[i];rows+=`<div class="rrow"><span>${esc(b.name)} 이체<div class="d">${KIND[b.kind]} · ${b.pct}%</div></span><span class="rout">−${won(amts[i])}</span></div>`});
+  rows+=`<div class="rbal"><span>잔액</span><span class="${Math.round(bal)===0?"good":"bad"}">${won(bal)}원</span></div>`;
+  $("rlist").innerHTML=rows;
+  renderFuture();renderGoal();renderCheck();save();
+}
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}
+
+function monthlySave(){const {amts}=split();return state.buckets.reduce((a,b,i)=>a+(b.kind==="save"?amts[i]:0),0)}
+function monthlyEmer(){const {amts}=split();return state.buckets.reduce((a,b,i)=>a+(b.kind==="emer"?amts[i]:0),0)}
+function monthlySpend(){const {amts}=split();return state.buckets.reduce((a,b,i)=>a+(b.kind==="spend"?amts[i]:0),0)}
+function deposit(m,n){const r=state.dep/100;let int=m*r*(n*(n+1)/2)/12;if(state.tax)int*=1-0.154;return m*n+int}
+function invest(m,n){const R=state.inv/100;if(R===0)return m*n;const i=Math.pow(1+R,1/12)-1;return m*((Math.pow(1+i,n)-1)/i)*(1+i)}
+
+function renderFuture(){
+  const m=monthlySave(),Y=Math.max(1,Math.min(30,state.years|0)),N=Y*12;
+  $("savedesc").textContent=`'모으는 돈'으로 지정한 통장 합계 월 ${won(m)}원을 ${Y}년 동안 모으는 경우예요. 비상금은 계산에서 뺐어요.`;
+  const P=m*N,D=deposit(m,N),I=invest(m,N);
+  $("kpis").innerHTML=`<div class="kpi prin"><div class="muted" style="font-size:12px">납입 원금</div><div class="v">${man(P)}</div></div>
+   <div class="kpi dep"><div class="muted" style="font-size:12px">적금 ${state.tax?"세후":"세전"}</div><div class="v">${man(D)}</div><div class="muted num" style="font-size:12px">+${won(D-P)}원</div></div>
+   <div class="kpi inv"><div class="muted" style="font-size:12px">투자 가정 평가액</div><div class="v">${man(I)}</div><div class="muted num" style="font-size:12px">${I-P>=0?"+":"−"}${won(Math.abs(I-P))}원</div></div>`;
+  // chart
+  const W=640,H=260,L=64,R=16,T=16,B=32,pw=W-L-R,ph=H-T-B;
+  const pts=[...Array(N+1).keys()];
+  const series=[[pts.map(n=>m*n),"--c6"],[pts.map(n=>deposit(m,n)),"--c1"],[pts.map(n=>invest(m,n)),"--c2"]];
+  const max=Math.max(1,...series.flatMap(s=>s[0]));
+  const nice=v=>{const p=Math.pow(10,Math.floor(Math.log10(v)));const f=v/p;return (f<=2?2:f<=5?5:10)*p};
+  const top=nice(max),x=n=>L+pw*n/N,y=v=>T+ph*(1-v/top);
+  let g="";
+  for(let k=0;k<=4;k++){const v=top*k/4;g+=`<line x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)" stroke-width="1"/><text x="${L-8}" y="${y(v)+4}" text-anchor="end">${v>=1e8?(v/1e8).toFixed(1).replace(/\.0$/,"")+"억":Math.round(v/1e4).toLocaleString("ko-KR")+"만"}</text>`}
+  const step=Y<=6?1:Y<=15?3:5;
+  for(let yr=0;yr<=Y;yr+=step)g+=`<text x="${x(yr*12)}" y="${H-10}" text-anchor="middle">${yr}년</text>`;
+  const minDim=Math.min(...series.map(s=>s[0][N]));
+  series.forEach(([d,c],si)=>{
+    g+=`<polyline fill="none" stroke="var(${c})" stroke-width="${si===0?1.5:2.5}" ${si===0?'stroke-dasharray="4 4"':""} points="${d.map((v,n)=>x(n).toFixed(1)+","+y(v).toFixed(1)).join(" ")}"/>`;
+    g+=`<circle cx="${x(N)}" cy="${y(d[N])}" r="4" fill="var(${c})"/>`;
+  });
+  $("chart").innerHTML=g;
+}
+function renderGoal(){
+  const m=monthlySave(),G=Math.max(0,state.goal)*10000;
+  if(m<=0){$("goalout").textContent="'모으는 돈' 통장이 없어서 계산할 수 없어요. 통장 종류를 바꿔 보세요."}
+  else{
+    const mo=G>0?Math.ceil(G/m):0;
+    let mi=0;if(G>0){while(invest(m,mi)<G&&mi<1200)mi++}
+    $("goalout").innerHTML=`원금만 모으면 <b>${fmtM(mo)}</b><br><span class="muted" style="font-size:13px">투자 수익률 ${state.inv}% 가정 시 약 ${mi>=1200?"100년 이상":fmtM(mi)}</span>`;
+  }
+  const e=monthlyEmer(),need=monthlySpend()*Math.max(1,state.ef|0);
+  $("efout").innerHTML=e<=0?"'비상금' 종류 통장이 없어요.":`목표 <span class="num">${won(need)}원</span><br>매달 ${won(e)}원씩이면 <b>${fmtM(Math.ceil(need/e))}</b>`;
+}
+function fmtM(n){const y=Math.floor(n/12),m=n%12;return (y?y+"년 ":"")+(m||!y?m+"개월":"")}
+
+function renderCheck(){
+  const {amts}=split(),key=new Date().toISOString().slice(0,7);
+  const c=state.check[key]||{};
+  $("check").innerHTML=state.buckets.map((b,i)=>`<label class="${c[i]?"done":""}" for="ck${i}"><input type="checkbox" id="ck${i}" data-ck="${i}" ${c[i]?"checked":""}><span>${esc(b.name)} 통장으로 <b class="num">${won(amts[i])}원</b> 이체</span></label>`).join("");
+}
+
+function renderAll(){renderTop();renderBuckets();
+  $("years").value=state.years;$("dep").value=state.dep;$("inv").value=state.inv;$("tax").checked=state.tax;$("goalamt").value=state.goal;$("efmonths").value=state.ef}
+
+// events
+$("salary").addEventListener("input",e=>{const v=parseInt(e.target.value.replace(/[^\d]/g,""))||0;state.salary=Math.min(v,10000000000);
+  const pos=e.target.value.length-e.target.selectionStart;e.target.value=won(state.salary);try{const p=e.target.value.length-pos;e.target.setSelectionRange(p,p)}catch(_){}
+  document.querySelectorAll("#quick button").forEach(b=>b.classList.toggle("on",+b.dataset.v===state.salary));renderDerived()});
+$("quick").addEventListener("click",e=>{const v=e.target.dataset.v;if(v){state.salary=+v;renderTop();renderDerived()}});
+$("presets").addEventListener("click",e=>{const p=e.target.dataset.p;if(p)applyPreset(p)});
+$("buckets").addEventListener("input",e=>{const t=e.target,i=+t.dataset.i,f=t.dataset.f;if(isNaN(i))return;
+  if(f==="pct"){const v=Math.max(0,Math.min(100,parseFloat(t.value)||0));state.buckets[i].pct=v;
+    const o=t.type==="range"?$("bp"+i):$("br"+i);o.value=v}
+  else if(f==="name")state.buckets[i].name=t.value;
+  state.preset="";document.querySelectorAll("#presets button").forEach(b=>b.classList.remove("on"));renderDerived()});
+$("buckets").addEventListener("change",e=>{const t=e.target;if(t.dataset.f==="kind"){state.buckets[+t.dataset.i].kind=t.value;state.preset="";renderTop();renderDerived()}});
+$("buckets").addEventListener("click",e=>{const d=e.target.dataset.del;if(d===undefined)return;if(state.buckets.length<=1)return;
+  const i=+d;state.buckets.splice(i,1);if(state.rem===i)state.rem=state.buckets.length-1;else if(state.rem>i)state.rem--;state.preset="";renderTop();renderBuckets()});
+$("add").addEventListener("click",()=>{if(state.buckets.length>=6)return;state.buckets.push({name:"새 통장",pct:0,kind:"save"});state.preset="";renderTop();renderBuckets()});
+$("fill").addEventListener("click",()=>{const {total}=split();const b=state.buckets[state.rem];b.pct=Math.max(0,Math.round((b.pct+100-total)*10)/10);renderBuckets()});
+[["years","years"],["dep","dep"],["inv","inv"],["goalamt","goal"],["efmonths","ef"]].forEach(([id,k])=>$(id).addEventListener("input",e=>{state[k]=parseFloat(e.target.value)||0;renderDerived()}));
+$("tax").addEventListener("change",e=>{state.tax=e.target.checked;renderDerived()});
+$("check").addEventListener("change",e=>{const i=e.target.dataset.ck;if(i===undefined)return;const key=new Date().toISOString().slice(0,7);
+  state.check[key]=state.check[key]||{};state.check[key][i]=e.target.checked;renderCheck();save()});
+$("reset").addEventListener("click",()=>{const key=new Date().toISOString().slice(0,7);state.check[key]={};renderCheck();save()});
+$("copy").addEventListener("click",()=>{const {amts}=split();
+  const txt=`[월급 이체 계획] 실수령 ${won(state.salary)}원\n`+state.buckets.map((b,i)=>`- ${b.name} (${b.pct}%): ${won(amts[i])}원`).join("\n");
+  const done=()=>{$("copied").hidden=false;setTimeout(()=>$("copied").hidden=true,2500)};
+  try{navigator.clipboard.writeText(txt).then(done,()=>fallback(txt,done))}catch(_){fallback(txt,done)}});
+function fallback(t,done){const ta=document.createElement("textarea");ta.value=t;document.body.appendChild(ta);ta.select();try{document.execCommand("copy");done()}catch(_){}ta.remove()}
+
+load();renderAll();
+})();
+</script>
+</body>
+</html>
