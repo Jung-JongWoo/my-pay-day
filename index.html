@@ -205,13 +205,22 @@ const PRESETS={
 const KIND={save:"모으는 돈",emer:"비상금",spend:"쓰는 돈"};
 const COLORS=["--c1","--c2","--c3","--c4","--c5","--c6"];
 const $=id=>document.getElementById(id);
+const monthKey=()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")};
+let seq=0;const uid=()=>"b"+Date.now().toString(36)+(seq++);
 const won=n=>Math.round(n).toLocaleString("ko-KR");
 const man=n=>{const m=n/10000;return (m>=10000?(m/10000).toFixed(2).replace(/\.?0+$/,"")+"억":(Math.round(m*10)/10).toLocaleString("ko-KR")+"만")+" 원"};
 
 let state={salary:2500000,buckets:[],rem:0,preset:"40·5·5·50",years:5,dep:3.5,inv:7,tax:true,goal:3000,ef:3,check:{}};
-function load(){try{const s=JSON.parse(localStorage.getItem("payday-split")||"null");if(s&&s.buckets&&s.buckets.length)state=Object.assign(state,s);else applyPreset(state.preset,true)}catch(e){applyPreset(state.preset,true)}}
+function load(){try{const s=JSON.parse(localStorage.getItem("payday-split")||"null");if(s&&s.buckets&&s.buckets.length){state=Object.assign(state,s);migrate()}else applyPreset(state.preset,true)}catch(e){applyPreset(state.preset,true)}}
+function migrate(){
+  state.buckets.forEach(b=>{if(!b.id)b.id=uid()});
+  // 예전 저장본: 체크 기록이 통장 순번(0,1,2…)으로 저장돼 있어 id 키로 옮긴다
+  Object.keys(state.check||{}).forEach(k=>{const c=state.check[k],n={};
+    Object.keys(c).forEach(i=>{const b=state.buckets[+i];if(/^\d+$/.test(i)){if(b&&c[i])n[b.id]=true}else n[i]=c[i]});
+    state.check[k]=n});
+}
 function save(){try{localStorage.setItem("payday-split",JSON.stringify(state))}catch(e){}}
-function applyPreset(name,silent){state.preset=name;state.buckets=PRESETS[name].map(([n,p,k])=>({name:n,pct:p,kind:k}));
+function applyPreset(name,silent){state.preset=name;state.buckets=PRESETS[name].map(([n,p,k])=>({id:uid(),name:n,pct:p,kind:k}));
   const i=state.buckets.findIndex(b=>/생활비/.test(b.name));state.rem=i<0?state.buckets.length-1:i;if(!silent)renderAll()}
 
 function split(){
@@ -306,9 +315,9 @@ function renderGoal(){
 function fmtM(n){const y=Math.floor(n/12),m=n%12;return (y?y+"년 ":"")+(m||!y?m+"개월":"")}
 
 function renderCheck(){
-  const {amts}=split(),key=new Date().toISOString().slice(0,7);
+  const {amts}=split(),key=monthKey();
   const c=state.check[key]||{};
-  $("check").innerHTML=state.buckets.map((b,i)=>`<label class="${c[i]?"done":""}" for="ck${i}"><input type="checkbox" id="ck${i}" data-ck="${i}" ${c[i]?"checked":""}><span>${esc(b.name)} 통장으로 <b class="num">${won(amts[i])}원</b> 이체</span></label>`).join("");
+  $("check").innerHTML=state.buckets.map((b,i)=>`<label class="${c[b.id]?"done":""}" for="ck${i}"><input type="checkbox" id="ck${i}" data-ck="${b.id}" ${c[b.id]?"checked":""}><span>${esc(b.name)} 통장으로 <b class="num">${won(amts[i])}원</b> 이체</span></label>`).join("");
 }
 
 function renderAll(){renderTop();renderBuckets();
@@ -328,13 +337,13 @@ $("buckets").addEventListener("input",e=>{const t=e.target,i=+t.dataset.i,f=t.da
 $("buckets").addEventListener("change",e=>{const t=e.target;if(t.dataset.f==="kind"){state.buckets[+t.dataset.i].kind=t.value;state.preset="";renderTop();renderDerived()}});
 $("buckets").addEventListener("click",e=>{const d=e.target.dataset.del;if(d===undefined)return;if(state.buckets.length<=1)return;
   const i=+d;state.buckets.splice(i,1);if(state.rem===i)state.rem=state.buckets.length-1;else if(state.rem>i)state.rem--;state.preset="";renderTop();renderBuckets()});
-$("add").addEventListener("click",()=>{if(state.buckets.length>=6)return;state.buckets.push({name:"새 통장",pct:0,kind:"save"});state.preset="";renderTop();renderBuckets()});
+$("add").addEventListener("click",()=>{if(state.buckets.length>=6)return;state.buckets.push({id:uid(),name:"새 통장",pct:0,kind:"save"});state.preset="";renderTop();renderBuckets()});
 $("fill").addEventListener("click",()=>{const {total}=split();const b=state.buckets[state.rem];b.pct=Math.max(0,Math.round((b.pct+100-total)*10)/10);renderBuckets()});
 [["years","years"],["dep","dep"],["inv","inv"],["goalamt","goal"],["efmonths","ef"]].forEach(([id,k])=>$(id).addEventListener("input",e=>{state[k]=parseFloat(e.target.value)||0;renderDerived()}));
 $("tax").addEventListener("change",e=>{state.tax=e.target.checked;renderDerived()});
-$("check").addEventListener("change",e=>{const i=e.target.dataset.ck;if(i===undefined)return;const key=new Date().toISOString().slice(0,7);
+$("check").addEventListener("change",e=>{const i=e.target.dataset.ck;if(i===undefined)return;const key=monthKey();
   state.check[key]=state.check[key]||{};state.check[key][i]=e.target.checked;renderCheck();save()});
-$("reset").addEventListener("click",()=>{const key=new Date().toISOString().slice(0,7);state.check[key]={};renderCheck();save()});
+$("reset").addEventListener("click",()=>{const key=monthKey();state.check[key]={};renderCheck();save()});
 $("copy").addEventListener("click",()=>{const {amts}=split();
   const txt=`[월급 이체 계획] 실수령 ${won(state.salary)}원\n`+state.buckets.map((b,i)=>`- ${b.name} (${b.pct}%): ${won(amts[i])}원`).join("\n");
   const done=()=>{$("copied").hidden=false;setTimeout(()=>$("copied").hidden=true,2500)};
